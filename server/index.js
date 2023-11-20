@@ -1,10 +1,13 @@
 const express = require("express");
 const cors = require("cors");
+const axios = require("axios");
+require('dotenv').config();
 
 const PORT = process.env.PORT || 3001;
 const app = express();
 
 app.use(cors()); // Allow cross-origin requests
+app.use(express.json());
 
 // Mock data for the purpose of this example.
 const articles = {
@@ -123,10 +126,35 @@ const articles = {
 };
 const articlesMap = new Map(Object.entries(articles));
 
+app.post("/api/databricks", async (req, res) => {
+    const urls = req.body.urls; // Assuming the request body contains an array of URLs
+    if (!urls || urls.length === 0) {
+        return res.status(400).send('URLs are required');
+    }
+
+    const databricksApi = 'https://infinitive-sandbox2.cloud.databricks.com/serving-endpoints/aws_demo_endpoint/invocations';
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + process.env.DATABRICKS_API_TOKEN // Use an environment variable for the API key
+    };
+
+    const data = {
+        "dataframe_split": {
+            "data": urls.map(url => [url])
+        }
+    };
+
+    try {
+        const response = await axios.post(databricksApi, data, { headers: headers });
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error calling Databricks API:', error);
+        res.status(500).send('Error calling Databricks API');
+    }
+});
+
 app.get("/api/articles/by-url", (req, res) => {
     const articleUrl = req.query.url;
-    console.log(articleUrl);
-
     let foundKey = "";
     const articleEntry = Object.entries(articles).find(([key, article]) => {
         const isMatch = article.url === articleUrl;
